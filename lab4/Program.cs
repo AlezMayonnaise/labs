@@ -1,215 +1,213 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Security.Authentication.ExtendedProtection;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml.Schema;
 
-public class RPNCalculator
+namespace Lesson1
 {
-    public class Program
+
+    class Token
     {
-        public static void Main(string[] args)
-        {
-            Console.Write("Введите математическое выражение: ");
-            string expression = Console.ReadLine();
 
-            try
-            {
-                double result = RPNCalculator.Calculate(expression);
-                Console.WriteLine("Результат: " + result);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Ошибка: " + ex.Message);
-            }
-        }
-    }
-    public static double Calculate(string expression)
-    {
-        // Преобразование строки с математическим выражением в список токенов
-        List<string> tokens = Tokenize(expression);
-
-        // Преобразование списка токенов в ОПЗ
-        List<string> rpnTokens = ConvertToRPN(tokens);
-
-        // Вычисление результата выражения на основе списка токенов ОПЗ
-        double result = EvaluateRPN(rpnTokens);
-
-        return result;
     }
 
-    private static List<string> Tokenize(string expression)
+    class Number : Token
     {
-        // Удаление пробелов из выражения
-        expression = expression.Replace(" ", "");
+        public double Symbol;
 
-        // Преобразование выражения в список токенов
-        List<string> tokens = new List<string>();
-
-        string currentToken = "";
-
-        foreach (char c in expression)
+        public Number(double num)
         {
-            if (char.IsDigit(c) || c == '.')    // Если символ является цифрой или точкой
-            {
-                currentToken += c;
-            }
-            else    // Если символ является оператором
-            {
-                if (!string.IsNullOrEmpty(currentToken))    // Если есть накопленное число, добавить его в список
-                {
-                    tokens.Add(currentToken);
-                    currentToken = "";
-                }
-
-                tokens.Add(c.ToString());    // Добавить оператор в список
-            }
-        }
-
-        if (!string.IsNullOrEmpty(currentToken))    // Если последний токен является числом, добавить его в список
-        {
-            tokens.Add(currentToken);
-        }
-
-        return tokens;
-    }
-
-    private static List<string> ConvertToRPN(List<string> tokens)
-    {
-        List<string> rpnTokens = new List<string>();
-        Stack<string> operatorStack = new Stack<string>();
-
-        foreach (string token in tokens)
-        {
-            if (double.TryParse(token, out double operand))    // Если токен является числом
-            {
-                rpnTokens.Add(token);
-            }
-            else if (IsOperator(token))    // Если токен является оператором
-            {
-                while (operatorStack.Count > 0 && IsOperator(operatorStack.Peek()) && GetOperatorPrecedence(token) <= GetOperatorPrecedence(operatorStack.Peek()))
-                {
-                    rpnTokens.Add(operatorStack.Pop());
-                }
-
-                operatorStack.Push(token);
-            }
-            else if (token == "(")    // Если токен является открывающей скобкой
-            {
-                operatorStack.Push(token);
-            }
-            else if (token == ")")    // Если токен является закрывающей скобкой
-            {
-                while (operatorStack.Count > 0 && operatorStack.Peek() != "(")
-                {
-                    rpnTokens.Add(operatorStack.Pop());
-                }
-
-                if (operatorStack.Count == 0 || operatorStack.Peek() != "(")
-                {
-                    throw new ArgumentException("Некорректное выражение: незакрытая скобка");
-                }
-
-                operatorStack.Pop();
-            }
-            else
-            {
-                throw new ArgumentException("Некорректное выражение: неподдерживаемый токен " + token);
-            }
-        }
-
-        while (operatorStack.Count > 0)
-        {
-            if (operatorStack.Peek() == "(")
-            {
-                throw new ArgumentException("Некорректное выражение: незакрытая скобка");
-            }
-
-            rpnTokens.Add(operatorStack.Pop());
-        }
-
-        return rpnTokens;
-    }
-
-    private static bool IsOperator(string token)
-    {
-        return token == "+" || token == "-" || token == "*" || token == "/";
-    }
-
-    private static int GetOperatorPrecedence(string op)
-    {
-        if (op == "+" || op == "-")
-        {
-            return 1;
-        }
-        else if (op == "*" || op == "/")
-        {
-            return 2;
-        }
-        else
-        {
-            return 0;
+            Symbol = num;
         }
     }
 
-    private static double EvaluateRPN(List<string> rpnTokens)
+    class Operation : Token
     {
-        Stack<double> operandStack = new Stack<double>();
-
-        foreach (string token in rpnTokens)
+        public char Symbol;
+        public int Priorety;
+        public Operation(char symbol)
         {
-            if (double.TryParse(token, out double operand))    // Если токен является числом
+            Symbol = symbol;
+            Priorety = GetPriorety(symbol);
+        }
+
+        private int GetPriorety(char symbol)
+        {
+            Dictionary<object, int> prioretyDictionary = new Dictionary<object, int>
             {
-                operandStack.Push(operand);
-            }
-            else if (IsOperator(token))    // Если токен является оператором
+                {'+', 1},
+                {'-', 1},
+                {'*', 2},
+                {'/', 2},
+                {'(', 0},
+                {')', 5},
+            };
+            return prioretyDictionary[symbol];
+        }
+    }
+
+    class Parenthesis : Token
+    {
+        public char Symbol;
+        public bool IsClosing;
+        public Parenthesis(char symbol)
+        {
+            if (symbol != '(' && symbol != ')')
+                throw new ArgumentException("This is not valid bracket");
+
+            IsClosing = symbol == ')';
+            Symbol = symbol;
+        }
+    }
+
+    class RPN
+    {
+        static void Main(string[] args)
+        {
+            Console.Write("Введите выражение: ");
+            string str = Console.ReadLine();
+            str = str.Replace(" ", string.Empty);
+            var tokens = GetToken(str);
+            var prn = PRN(tokens);
+            Console.Write("Значение: ");
+            Console.WriteLine(string.Join(" ", Result(prn)));
+        }
+
+        public static List<Token> GetToken(string str)
+        {
+            List<Token> tokens = new List<Token>();
+            string num = string.Empty;
+            for (int i = 0; i < str.Length; i++)
             {
-                if (operandStack.Count < 2)
+                if (char.IsDigit(str[i]) || str[i] == ',')
                 {
-                    throw new ArgumentException("Некорректное выражение: недостаточно операндов для оператора " + token);
+                    num += str[i];
                 }
-
-                double operand2 = operandStack.Pop();
-                double operand1 = operandStack.Pop();
-
-                double result;
-
-                if (token == "+")
+                else if (str[i] == '+' || str[i] == '-' || str[i] == '*' || str[i] == '/')
                 {
-                    result = operand1 + operand2;
-                }
-                else if (token == "-")
-                {
-                    result = operand1 - operand2;
-                }
-                else if (token == "*")
-                {
-                    result = operand1 * operand2;
-                }
-                else if (token == "/")
-                {
-                    if (operand2 == 0)
+                    if (num != string.Empty)
                     {
-                        throw new DivideByZeroException();
+                        tokens.Add(new Number(double.Parse(num)));
+                        num = string.Empty;
+                    }
+                    tokens.Add(new Operation(str[i]));
+                }
+                else if (str[i] == '(' || str[i] == ')')
+                {
+                    if (num != string.Empty)
+                    {
+                        tokens.Add(new Number(double.Parse(num)));
+                        num = string.Empty;
+                    }
+                    tokens.Add(new Parenthesis(str[i]));
+                }
+            }
+            if (num != string.Empty)
+            {
+                tokens.Add(new Number(double.Parse(num)));
+            }
+            return tokens;
+        }
+
+
+
+        public static List<Token> PRN(List<Token> tokens)
+        {
+            List<Token> prn = new List<Token>();
+            Stack<Token> stack = new Stack<Token>();
+            foreach (Token token in tokens)
+            {
+                if (stack.Count == 0 && !(token is Number))
+                {
+                    stack.Push(token);
+                    continue;
+                }
+                if (token is Operation)
+                {
+                    if (stack.Peek() is Parenthesis)
+                    {
+                        stack.Push(token);
+                        continue;
                     }
 
-                    result = operand1 / operand2;
+                    Operation oper = (Operation)token;
+                    Operation oper2 = (Operation)stack.Peek();
+                    if (oper.Priorety > oper2.Priorety)
+                    {
+                        stack.Push(token);
+                    }
+                    else if (oper.Priorety <= oper2.Priorety)
+                    {
+                        while (stack.Count > 0 && !(token is Parenthesis))
+                        {
+                            prn.Add(stack.Pop());
+                        }
+                        stack.Push(token);
+                    }
+                }
+                else if (token is Parenthesis)
+                {
+                    if (((Parenthesis)token).IsClosing)
+                    {
+                        while (!(stack.Peek() is Parenthesis))
+                        {
+                            prn.Add(stack.Pop());
+                        }
+                        stack.Pop();
+                    }
+                    else
+                    {
+                        stack.Push(token);
+                    }
+                }
+                else if (token is Number)
+                {
+                    prn.Add(token);
+                }
+            }
+            while (stack.Count > 0)
+            {
+                prn.Add(stack.Pop());
+            }
+            return prn;
+        }
+
+        public static Stack<double> Result(List<Token> expression)
+        {
+            Stack<double> stack = new Stack<double>();
+            foreach (Token token in expression)
+            {
+                if (token is Number number)
+                {
+                    number = (Number)token;
+                    stack.Push(number.Symbol);
                 }
                 else
                 {
-                    throw new ArgumentException("Неподдерживаемый оператор " + token);
+                    var second = stack.Pop();
+                    var first = stack.Pop();
+                    stack.Push(Calculate(token, first, second));
                 }
-
-                operandStack.Push(result);
             }
-            else
-            {
-                throw new ArgumentException("Неподдерживаемый токен " + token);
-            }
+            return stack;
         }
 
-        if (operandStack.Count != 1)
+        public static double Calculate(Token op, double first, double second)
         {
-            throw new ArgumentException("Некорректное выражение: лишние операнды");
+            var oper = (Operation)op;
+            switch (oper.Symbol)
+            {
+                case '*': return first * second;
+                case '/': return first / second;
+                case '+': return first + second;
+                case '-': return first - second;
+                default: return double.NaN;
+            }
         }
-
-        return operandStack.Pop();
     }
+
 }
